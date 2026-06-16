@@ -12,6 +12,9 @@ let state = {
 const elements = {
     btnRefresh: document.getElementById('btn-refresh'),
     btnExportCSV: document.getElementById('btn-export-csv'),
+    btnThemeToggle: document.getElementById('btn-theme-toggle'),
+    iconSun: document.querySelector('.icon-sun'),
+    iconMoon: document.querySelector('.icon-moon'),
     iconRefresh: document.querySelector('.icon-refresh'),
     searchInput: document.getElementById('search-input'),
     filterPills: document.getElementById('filter-pills'),
@@ -73,10 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.btnCopyLink.addEventListener('click', copyPermalinkToClipboard);
     elements.btnCopyText.addEventListener('click', copyTextToClipboard);
     elements.btnExportCSV.addEventListener('click', exportToCSV);
+    elements.btnThemeToggle.addEventListener('click', toggleTheme);
 });
 
 // --- INITIALIZE APP ---
 function initApp() {
+    initTheme();
     fetchReleaseNotes();
 }
 
@@ -473,4 +478,33 @@ function exportToCSV() {
     document.body.removeChild(link);
     
     showToast('Planilha CSV baixada com sucesso!', 'success');
+}
+
+// --- UTILITY: THEME MANAGEMENT ---
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        elements.iconSun.classList.add('hidden');
+        elements.iconMoon.classList.remove('hidden');
+    } else {
+        document.body.classList.remove('light-theme');
+        elements.iconSun.classList.remove('hidden');
+        elements.iconMoon.classList.add('hidden');
+    }
+}
+
+function toggleTheme() {
+    const isLight = document.body.classList.toggle('light-theme');
+    if (isLight) {
+        localStorage.setItem('theme', 'light');
+        elements.iconSun.classList.add('hidden');
+        elements.iconMoon.classList.remove('hidden');
+        showToast('Modo claro ativado!', 'success');
+    } else {
+        localStorage.setItem('theme', 'dark');
+        elements.iconSun.classList.remove('hidden');
+        elements.iconMoon.classList.add('hidden');
+        showToast('Modo escuro ativado!', 'success');
+    }
 }
