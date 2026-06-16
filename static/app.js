@@ -19,15 +19,19 @@ const elements = {
     searchInput: document.getElementById('search-input'),
     filterPills: document.getElementById('filter-pills'),
     statsBadgeNum: document.querySelector('#stats-badge .stats-num'),
+    syncTime: document.getElementById('sync-time'),
     
     // Feed sections
     loadingState: document.getElementById('loading-state'),
     emptyState: document.getElementById('empty-state'),
     feedContainer: document.getElementById('feed-container'),
+    btnClearSearch: document.getElementById('btn-clear-search'),
     
     // Workspace sections
     workspaceEmpty: document.getElementById('workspace-empty'),
     workspaceContent: document.getElementById('workspace-content'),
+    workspaceSection: document.querySelector('.workspace-section'),
+    btnCloseWorkspace: document.getElementById('btn-close-workspace'),
     selectedDate: document.getElementById('selected-date'),
     selectedType: document.getElementById('selected-type'),
     selectedHtmlContent: document.getElementById('selected-html-content'),
@@ -77,11 +81,62 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.btnCopyText.addEventListener('click', copyTextToClipboard);
     elements.btnExportCSV.addEventListener('click', exportToCSV);
     elements.btnThemeToggle.addEventListener('click', toggleTheme);
+
+    // Mobile workspace close button
+    elements.btnCloseWorkspace.addEventListener('click', () => {
+        elements.workspaceSection.classList.remove('open');
+    });
+
+    // Close mobile workspace when clicking outside of details card
+    elements.workspaceSection.addEventListener('click', (e) => {
+        if (window.innerWidth <= 992 && e.target === elements.workspaceSection) {
+            elements.workspaceSection.classList.remove('open');
+        }
+    });
+
+    // Reset Search button inside Empty State
+    elements.btnClearSearch.addEventListener('click', () => {
+        elements.searchInput.value = '';
+        state.searchQuery = '';
+        state.currentFilter = 'all';
+        
+        // Reset active filter pill in UI
+        document.querySelectorAll('.pill').forEach(p => {
+            if (p.dataset.filter === 'all') {
+                p.classList.add('active');
+            } else {
+                p.classList.remove('active');
+            }
+        });
+        
+        applyFilters();
+    });
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+        // "/" key focuses search bar (if not typing in input)
+        if (e.key === '/' && document.activeElement !== elements.searchInput) {
+            e.preventDefault();
+            elements.searchInput.focus();
+            elements.searchInput.select();
+        }
+        // "Escape" key blurs search bar
+        if (e.key === 'Escape' && document.activeElement === elements.searchInput) {
+            elements.searchInput.blur();
+        }
+    });
 });
 
 // --- INITIALIZE APP ---
 function initApp() {
     initTheme();
+    // Load last sync time
+    const lastSync = localStorage.getItem('last_sync_time');
+    if (lastSync) {
+        elements.syncTime.textContent = `Sincronizado às ${lastSync}`;
+    } else {
+        elements.syncTime.textContent = 'Nunca sincronizado';
+    }
     fetchReleaseNotes();
 }
 
@@ -99,6 +154,12 @@ async function fetchReleaseNotes() {
             // Render the items
             renderFeed();
             updateStats();
+            
+            // Update last sync time
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            elements.syncTime.textContent = `Sincronizado às ${timeStr}`;
+            localStorage.setItem('last_sync_time', timeStr);
             
             // If we have items and none is selected, select the first one automatically
             if (state.updates.length > 0 && !state.selectedUpdate) {
@@ -145,6 +206,8 @@ function renderFeed() {
         const card = document.createElement('div');
         card.className = `update-card type-${update.type.toLowerCase()}`;
         card.dataset.id = update.id;
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
         
         if (state.selectedUpdate && state.selectedUpdate.id === update.id) {
             card.classList.add('active');
@@ -190,6 +253,14 @@ function renderFeed() {
             selectUpdate(update.id);
         });
         
+        // Keyboard navigation for accessibility
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectUpdate(update.id);
+            }
+        });
+        
         // Copy card click handler (stops propagation so card selection isn't triggered)
         const btnCopy = card.querySelector('.btn-card-copy');
         btnCopy.addEventListener('click', (e) => {
@@ -220,6 +291,9 @@ function selectUpdate(id) {
     // Update workspace UI
     elements.workspaceEmpty.classList.add('hidden');
     elements.workspaceContent.classList.remove('hidden');
+    
+    // Open mobile bottom sheet overlay
+    elements.workspaceSection.classList.add('open');
     
     elements.selectedDate.textContent = update.date;
     
