@@ -11,6 +11,7 @@ let state = {
 // --- DOM ELEMENTS ---
 const elements = {
     btnRefresh: document.getElementById('btn-refresh'),
+    btnExportCSV: document.getElementById('btn-export-csv'),
     iconRefresh: document.querySelector('.icon-refresh'),
     searchInput: document.getElementById('search-input'),
     filterPills: document.getElementById('filter-pills'),
@@ -71,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.btnShareTwitter.addEventListener('click', shareOnTwitter);
     elements.btnCopyLink.addEventListener('click', copyPermalinkToClipboard);
     elements.btnCopyText.addEventListener('click', copyTextToClipboard);
+    elements.btnExportCSV.addEventListener('click', exportToCSV);
 });
 
 // --- INITIALIZE APP ---
@@ -163,6 +165,12 @@ function renderFeed() {
                 ${update.html}
             </div>
             <div class="card-footer">
+                <button class="btn-card-copy" title="Copiar texto desta nota">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
                 <span class="card-action-text">
                     Ver detalhes
                     <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none">
@@ -175,6 +183,13 @@ function renderFeed() {
         // Card click handler
         card.addEventListener('click', () => {
             selectUpdate(update.id);
+        });
+        
+        // Copy card click handler (stops propagation so card selection isn't triggered)
+        const btnCopy = card.querySelector('.btn-card-copy');
+        btnCopy.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyCardText(update);
         });
         
         elements.feedContainer.appendChild(card);
@@ -410,4 +425,52 @@ function showToast(message, type = 'success') {
             toast.remove();
         });
     }, 4000);
+}
+
+// --- UTILITY: COPY SPECIFIC CARD TEXT ---
+function copyCardText(update) {
+    const cleanText = stripHtml(update.html);
+    const textToCopy = `BigQuery Release Notes (${update.date}) - [${update.type}]\n\n${cleanText}\n\nLink: ${update.link}`;
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        showToast('Nota copiada para a área de transferência!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showToast('Erro ao copiar nota', 'error');
+    });
+}
+
+// --- UTILITY: EXPORT FILTERED NOTES TO CSV ---
+function exportToCSV() {
+    if (state.filteredUpdates.length === 0) {
+        showToast('Não há notas no feed atual para exportar.', 'error');
+        return;
+    }
+    
+    let csvRows = [];
+    // Headers
+    csvRows.push('"Data","Tipo","Descricao","Link"');
+    
+    state.filteredUpdates.forEach(update => {
+        const cleanDesc = stripHtml(update.html).replace(/\s+/g, ' ').trim().replace(/"/g, '""');
+        const cleanDate = update.date.replace(/"/g, '""');
+        const cleanType = update.type.replace(/"/g, '""');
+        const cleanLink = update.link.replace(/"/g, '""');
+        
+        csvRows.push(`"${cleanDate}","${cleanType}","${cleanDesc}","${cleanLink}"`);
+    });
+    
+    const csvString = csvRows.join('\r\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' }); // UTF-8 BOM
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bigquery_release_notes_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('Planilha CSV baixada com sucesso!', 'success');
 }
